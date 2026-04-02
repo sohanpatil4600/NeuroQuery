@@ -107,7 +107,26 @@ VAULT = {
     }
 }
 
-import difflib
+import torch
+import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
+
+# Lazy load Embedder to avoid blocking startup
+embedder = None
+vault_keys = list(VAULT.keys())
+vault_embeddings = None
+
+def init_vault():
+    global embedder, vault_embeddings
+    if embedder is None:
+        try:
+            print("[VAULT] Initializing Semantic Cache Embedder...")
+            embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+            print(f"[VAULT] Embedding {len(vault_keys)} predefined queries in-memory...")
+            vault_embeddings = embedder.encode(vault_keys, convert_to_tensor=True)
+        except Exception as e:
+            print(f"[VAULT] Critical Error during init: {e}")
+            embedder = "FAILED"
 
 def get_vault_entry(question):
     q = question.strip().lower().rstrip('.')
@@ -115,16 +134,30 @@ def get_vault_entry(question):
     # 1. Exact/Normalized Match (Fast)
     for k, v in VAULT.items():
         if k.strip().lower().rstrip('.') == q:
+            print(f"[VAULT] Exact match found for: '{question}'")
             return v
             
-    # 2. Fuzzy Match (Resilience for Typos)
-    keys = list(VAULT.keys())
-    # Find the best match with at least 90% similarity
-    matches = difflib.get_close_matches(question, keys, n=1, cutoff=0.90)
-    
-    if matches:
-        matched_key = matches[0]
-        print(f"[VAULT] Fuzzy match found: '{question}' matches '{matched_key}'")
-        return VAULT[matched_key]
+    # 2. Semantic Match (Resilience for Typos & Synonyms)
+    init_vault()
+    if embedder == "FAILED":
+        return None
+        
+    try:
+        q_emb = embedder.encode(question, convert_to_tensor=True)
+        cos_scores = F.cosine_similarity(q_emb.unsqueeze(0), vault_embeddings)
+        
+        # Get the highest semantic similarity
+        best_score_idx = torch.argmax(cos_scores).item()
+        best_score = cos_scores[best_score_idx].item()
+        
+        print(f"Top Score observed: {best_score}")
+        
+        # Threshold: 0.65 is optimal for semantic equivalence in the all-MiniLM model
+        if best_score > 0.65:
+            matched_key = vault_keys[best_score_idx]
+            print(f"[VAULT] Semantic match found (Score: {best_score:.2f}): '{question}' -> '{matched_key}'")
+            return VAULT[matched_key]
+    except Exception as e:
+        print(f"[VAULT] Runtime Error: {e}")
         
     return None
