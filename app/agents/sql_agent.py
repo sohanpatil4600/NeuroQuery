@@ -58,8 +58,10 @@ def run(state):
         3. Respect the user's requested date range. If they ask for 2026, use 2026. Only use "BETWEEN '2024-01-01' AND '2025-12-31'" if the user asks for "recent" or "standard" data without specifying a year.
         4. JOIN tables whenever necessary (e.g. sales.customer_id = customers.customer_id).
         5. Output ONLY the raw SQL. No markdown, no "Query:", no formatting.
+        6. CRITICAL: If the user asks about a personal fact or preference (e.g., "What is my favorite product?"), AND the answer is explicitly stated in the Long-Term Memory Facts below, DO NOT guess using GROUP BY COUNT. Instead, write a simple SELECT query that directly filters or returns that known fact (e.g. SELECT 'Hardware Key' AS result; or SELECT * FROM products WHERE name = 'Hardware Key').
         
-        # PREVIOUS CONVERSATION CONTEXT
+        # PREVIOUS CONVERSATION CONTEXT & LONG-TERM MEMORY
+        Long-Term Memory Facts: {state.get('metadata', {}).get('mem_context', '')}
         History: {state.get('history', [])}
         Question: {state.get('corrected_question', state['question'])}
         SQL Query:"""

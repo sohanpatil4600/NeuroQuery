@@ -11,3 +11,5 @@ mem0ai
 apscheduler
 python-dotenv
 requests
+sentence-transformers
+qdrant-client

@@ -1,5 +1,5 @@
 import pandas as pd
-from app.memory.mem0_client import memory
+from app.memory.mem0_client import get_memory
 
 def run(state):
     df = pd.DataFrame(state["result"])
@@ -55,6 +55,7 @@ def run(state):
     }
     
     try:
+        memory = get_memory()
         memory_content = f"User Question: {state['question']} | AI Insight: {primary_metric_name} was {final_val:,.2f}"
         memory.add(memory_content, user_id=state["user_id"])
         print(f"[MEMORY] Successfully stored interaction for {state['user_id']}")

@@ -13,7 +13,8 @@ config = {
         "provider": "qdrant",
         "config": {
             "path": "/Users/sohanpatil/Downloads/NeuroQuery/memories/qdrant_storage",
-            "collection_name": "agentic_bi_memories"
+            "collection_name": "agentic_bi_memories_v3",
+            "embedding_model_dims": 384
         }
     },
     "llm": {
@@ -31,21 +32,27 @@ config = {
     }
 }
 
-memory = None
-try:
-    if groq_key:
-        print(f"[MEMORY] Initializing with key: {groq_key[:5]}...")
-        memory = Memory.from_config(config)
-        print("[MEMORY] Mem0 initialized successfully with real provider.")
-    else:
-        print("[MEMORY] GROQ_API_KEY missing or invalid - Using Mock Memory.")
-except Exception as e:
-    print(f"[MEMORY] CRITICAL: Initialization failed: {e}")
-    import traceback
-    traceback.print_exc()
+memory_instance = None
 
-# Provide a mock memory object if init fails to prevent crashes
-if memory is None:
+def get_memory():
+    global memory_instance
+    if memory_instance is not None:
+        return memory_instance
+        
+    try:
+        if groq_key:
+            print(f"[MEMORY] Initializing with key: {groq_key[:5]}...")
+            memory_instance = Memory.from_config(config)
+            print("[MEMORY] Mem0 initialized successfully with real provider.")
+            return memory_instance
+        else:
+            print("[MEMORY] GROQ_API_KEY missing or invalid - Using Mock Memory.")
+    except Exception as e:
+        print(f"[MEMORY] CRITICAL: Initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Provide a mock memory object if init fails to prevent crashes
     class MockMemory:
         def add(self, *args, **kwargs): 
             print("[MEMORY-MOCK] Add ignored (Initialization failed)")
@@ -53,4 +60,6 @@ if memory is None:
         def search(self, *args, **kwargs): 
             print("[MEMORY-MOCK] Search returned [] (Initialization failed)")
             return []
-    memory = MockMemory()
+            
+    memory_instance = MockMemory()
+    return memory_instance

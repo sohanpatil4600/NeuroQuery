@@ -1,4 +1,4 @@
-from app.memory.mem0_client import memory
+from app.memory.mem0_client import get_memory
 from langchain_groq import ChatGroq
 import os
 from app.agents.vault import get_vault_entry
@@ -16,8 +16,21 @@ def run(state):
         return state
 
     # 1. Memory Context
+    mem_context = ""
     try:
-        memory.search(state["question"], user_id=state["user_id"])
+        memory = get_memory()
+        mem_results = memory.search(state["question"], user_id=state["user_id"])
+        
+        # Parse the mem0 response (can be a list or a dict containing 'results')
+        results_list = mem_results.get("results", []) if isinstance(mem_results, dict) else mem_results
+        
+        if results_list and len(results_list) > 0:
+            mem_context_parts = []
+            for m in results_list:
+                if isinstance(m, dict) and "memory" in m:
+                    mem_context_parts.append(m["memory"])
+            if mem_context_parts:
+                mem_context = "Long-Term User Facts/Definitions: " + " | ".join(mem_context_parts)
     except Exception as e:
         print(f"Memory warning: {e}")
 
@@ -36,6 +49,7 @@ def run(state):
            inventory, employee_performance, website_traffic, expenses, competitor_metrics, 
            churn_analysis, product_reviews, operating_budget
         
+        {mem_context}
         History: {state.get('history', [])}
         Question: {state['question']}
         
@@ -62,6 +76,7 @@ def run(state):
 
     state["metadata"] = {
         "tables": selected_tables,
-        "columns": ["*"] # Let SQL Agent handle specific columns
+        "columns": ["*"], # Let SQL Agent handle specific columns
+        "mem_context": mem_context
     }
     return state
