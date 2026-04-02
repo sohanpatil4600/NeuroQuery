@@ -639,7 +639,10 @@ with tab1:
                     import sys
                     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
                     from app.langgraph.graph import bi_graph
-                    from app.billing.metering import record_usage
+                    from app.billing.metering import record_usage, check_limit
+                    
+                    # Enforce billing hard-limit before spending LLM tokens locally
+                    check_limit("t1", "query", 50)
                     
                     # Run agents directly using the compiled graph
                     result = bi_graph.invoke({
