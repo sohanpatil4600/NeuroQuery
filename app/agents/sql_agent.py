@@ -62,6 +62,7 @@ def run(state):
         
         # PREVIOUS CONVERSATION CONTEXT & LONG-TERM MEMORY
         Long-Term Memory Facts: {state.get('metadata', {}).get('mem_context', '')}
+        Business Glossary/RAG: {state.get('rag_context', '')}
         History: {state.get('history', [])}
         Question: {state.get('corrected_question', state['question'])}
         SQL Query:"""

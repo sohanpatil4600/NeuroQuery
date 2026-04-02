@@ -1,0 +1,16 @@
+The available regions for sales and marketing are: North, South, East, West.
+The available products are: SaaS Pro, SaaS Elite, SaaS Basic, SaaS Plus, Enterprise Plan, Consulting Hr, Hardware Key, Training Pack.
+The company departments are: IT, HR, Sales, Marketing, Finance, Operations, R&D.
+The marketing acquisition channels are: FB, GAds, LI, Twitter, Organic, Referral, Email.
+Customer Loyalty Tiers are classified exactly as: Gold, Silver, Bronze.
+Support ticket priorities are classified exactly as: High, Medium, Low.
+Operating budgets are tracked quarterly across Q1, Q2, Q3, Q4 for the years 2024 to 2026.
+The active subscription plans and pricing are: SaaS Elite ($199.99), SaaS Pro ($99.99), SaaS Basic ($49.99).
+Warehouse locations for inventory include: WH_North, WH_South, WH_Main, WH_East.
+Customer ticket issue types are classified as: Bug, Feature, Billing, Login.
+Top marketing channel metrics use abbreviations FB (Facebook), GAds (Google Ads), and LI (LinkedIn).
+Employee roles in the system currently track: Sales Rep.
+Customer retention offers during churn prevention can be 0 (No) or 1 (Yes).
+Refunds granted during churn can be 0 (No) or 1 (Yes).
+Verified purchase status for product reviews can be 0 (No) or 1 (Yes).
+Tax deductible status for expenses can be 0 (No) or 1 (Yes).
