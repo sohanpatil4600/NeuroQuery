@@ -964,7 +964,7 @@ with tab2:
 
     st.markdown("---")
     
-    # 5. Core Technologies & MCP
+    # 5. Core Technologies
     col_tech_1, col_tech_2, col_tech_3 = st.columns(3)
     
     with col_tech_1:
@@ -996,12 +996,12 @@ with tab2:
     with col_tech_3:
         st.markdown("""
         <div style='background: #1e1e2d; padding: 20px; border-radius: 12px; border: 1px solid #323248; height: 100%;'>
-            <h3 style='color: #f39c12;'>🧩 MCP Tools</h3>
-            <p style='color: #7f8fa4; font-size: 0.9rem;'>The 'Agent Hands'</p>
+            <h3 style='color: #f39c12;'>🧩 Semantic Cache</h3>
+            <p style='color: #7f8fa4; font-size: 0.9rem;'>The 'Memory Booster'</p>
             <ul style='color: #cfd8dc; font-size: 0.9rem; margin-bottom: 0;'>
-                <li>folder: <code>mcp/</code></li>
-                <li>Agents use tools, not just text</li>
-                <li>SQL execution & Billing triggers</li>
+                <li>folder: <code>app/agents/vault.py</code></li>
+                <li>Avoids recomputing similar queries</li>
+                <li>Stores Embeddings + responses for reuse</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -1095,9 +1095,6 @@ with tab2:
         **6. ENTERPRISE MODULES**
         - `billing/metering.py`: Usage tracking (Stripe/Internal).
         - `governance/`: Audit logs, PII masking, Compliance.
-        
-        **7. MCP TOOLS**
-        - `mcp/`: Tool definitions enabling agents to perform actions (Run SQL, Calculator).
         """)
     
     st.markdown("---")
