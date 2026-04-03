@@ -302,7 +302,7 @@ with tab1:
         if c5.button("🏢 Warehouse Load", use_container_width=True): set_query("Show the distribution of inventory quantity across all warehouse locations.")
         if c6.button("⭐ Cust Satisfaction", use_container_width=True): set_query("Calculate the average customer satisfaction score for bug-related tickets.")
 
-    with st.expander("💡 Pro-Tip: Memory System", expanded=False):
+    with st.expander("💡 Pro-Tip: Memory System & RAG Context", expanded=False):
         st.info("""
         **💡 Intelligent Memory System**
         
@@ -313,6 +313,13 @@ with tab1:
         2. "Now filter that for only 'SaaS Pro'"
         
         *The agent understands "that" refers to the North region revenue context!*
+
+
+        **Question for RAG Context:**
+        1. "What is the total sum of non-tax-deductible expenses grouped by company category?"
+           RAG Broke - SQL Query - "WHERE tax_deductible = 'No' or tax_deductible = False"
+           RAG Worked - SQL Query - "WHERE tax_deductible = 0"
+        
         """)
     
     
