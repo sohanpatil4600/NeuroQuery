@@ -399,7 +399,7 @@ with tab1:
                 if st.form_submit_button("Submit Enterprise Record to Database", use_container_width=True):
                     try:
                         import sqlite3
-                        conn = sqlite3.connect('demo.db')
+                        conn = sqlite3.connect('enterprise_bi_db.sqlite')
                         cursor = conn.cursor()
                         # Matching the 10-column Enterprise Schema (transaction_id is auto)
                         cursor.execute('''

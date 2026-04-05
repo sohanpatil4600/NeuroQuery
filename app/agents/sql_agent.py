@@ -14,8 +14,8 @@ from app.agents.vault import get_vault_entry
 
 def run(state):
     # --- ENTERPRISE QUERY JOIN VAULT (Instant Fallback & Performance) ---
-    # Check if SQL was already set by metadata_agent vault check
-    if "sql" in state and state["sql"]:
+    # Check if SQL was already set by metadata_agent vault check AND no error occurred
+    if "sql" in state and state["sql"] and not state.get("error"):
         print(f"[VAULT] SQL already set for: {state['question']}")
         return state
 
@@ -64,9 +64,19 @@ def run(state):
         Long-Term Memory Facts: {state.get('metadata', {}).get('mem_context', '')}
         Business Glossary/RAG: {state.get('rag_context', '')}
         History: {state.get('history', [])}
+        
+        # SELF-HEALING CONTEXT:
+        Previous Attempt Failed: {"Yes" if state.get("error") else "No"}
+        Error Message: {state.get("error", "None")}
+        Current Retry Attempt: {state.get("retry_count", 0)} / 3
+        
+        If an error message is provided above, ANALYZE it against the schema and fix the SQL.
+        
         Question: {state.get('corrected_question', state['question'])}
         SQL Query:"""
         state["sql"] = llm.invoke(prompt).content.strip()
+        # Increment retry count
+        state["retry_count"] = state.get("retry_count", 0) + 1
     else:
         # Fallback simple logic
         q = state["question"].lower()

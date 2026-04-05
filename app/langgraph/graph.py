@@ -15,6 +15,22 @@ graph.add_edge("metadata", "rag")
 graph.add_edge("rag", "sql")
 graph.add_edge("sql", "impact")
 graph.add_edge("impact", "execute")
-graph.add_edge("execute", "bi")
+
+# --- REFLEXION LOOP (Self-Healing) ---
+def should_continue(state):
+    # If there is an error and we haven't hit the retry limit, go back to SQL Agent
+    if state.get("error") and state.get("retry_count", 0) < 2:
+        print(f"--- REFLEXION TRIGGERED (Attempt {state['retry_count']}) ---")
+        return "retry"
+    return "end"
+
+graph.add_conditional_edges(
+    "execute",
+    should_continue,
+    {
+        "retry": "sql",
+        "end": "bi"
+    }
+)
 
 bi_graph = graph.compile()
