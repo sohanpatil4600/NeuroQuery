@@ -3,7 +3,9 @@ import json
 from app.memory.mem0_client import get_memory
 from app.agents.vault import add_to_vault
 from app.utils.llm_factory import get_llm
+from app.utils.tracing import trace_agent
 
+@trace_agent("bi")
 def run(state):
     df = pd.DataFrame(state["result"])
     
@@ -65,6 +67,15 @@ def run(state):
             
             # Simple direct prompt call for efficiency
             response = llm.invoke(prompt)
+            
+            # Capture tokens for Monitoring Hub
+            if hasattr(response, "response_metadata"):
+                usage = response.response_metadata.get("token_usage", {})
+                state["last_token_usage"] = {
+                    "input": usage.get("prompt_tokens", 0),
+                    "output": usage.get("completion_tokens", 0)
+                }
+            
             content = response.content
             # Clean up potential markdown formatting
             if "```json" in content:

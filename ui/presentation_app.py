@@ -13,6 +13,11 @@ except ImportError:
     from render_utils import render_data_results
 
 try:
+    from ui.monitoring_hub import render_monitoring_dashboard
+except ImportError:
+    from monitoring_hub import render_monitoring_dashboard
+
+try:
     from seed_db import seed as seed_data
     from app.billing.metering import save_conversation, get_conversation_history
 except ImportError:
@@ -352,13 +357,14 @@ if st.session_state.get("show_rate_limit_error"):
         st.rerun()
 
 # Tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🚀 Live Demo", 
     "ℹ️ About Project", 
     "🛠️ Tech Stack", 
     "📐 HLD & LLD", 
     "🏗️ Architecture", 
-    "📝 System Logs"
+    "📝 System Logs",
+    "📊 Monitoring Hub"
 ])
 
 # --- TAB 1: LIVE DEMO ---
@@ -778,6 +784,7 @@ with tab1:
         
         # Mapping for user-friendly node names
         node_labels = {
+            "orchestrator": "📡 NeuroQuery Connection Established...",
             "metadata": "🔍 Analyzing Intent & Normalizing Query...",
             "rag": "🕸️ Fetching Business Rules & Domain Context...",
             "sql": "📝 Generating Enterprise SQL Query...",
@@ -809,6 +816,8 @@ with tab1:
                         for line in response.iter_lines():
                             if line:
                                 chunk = json.loads(line.decode('utf-8'))
+                                # print debug to terminal where streamlit is running
+                                print(f"[UI-DEBUG] Received: {chunk}")
                                 
                                 if chunk.get("status") == "error":
                                     st.session_state.rate_limit_error = chunk.get("error", "Unknown error occurred.")
@@ -2035,6 +2044,10 @@ with tab6:
                         st.warning(f"**[{timestamp}] {event}**: {details}", icon="⚠️")
                     else:
                         st.info(f"**[{timestamp}] {event}**: {details}", icon="ℹ️")
+
+# --- TAB 7: MONITORING HUB ---
+with tab7:
+    render_monitoring_dashboard()
 
 # --- FOOTER ---
 st.markdown("<hr style='border: 1px solid #e74c3c; background-color: #e74c3c; opacity: 1; margin: 30px 0;'>", unsafe_allow_html=True)

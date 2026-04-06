@@ -2,7 +2,9 @@ from app.memory.mem0_client import get_memory
 from app.utils.llm_factory import get_llm
 import os
 from app.agents.vault import get_vault_entry
+from app.utils.tracing import trace_agent
 
+@trace_agent("metadata")
 def run(state):
     # 1. Memory Context (Now Priority #1)
     mem_context = ""
@@ -59,7 +61,17 @@ def run(state):
         """
         import json
         try:
-            raw_response = llm.invoke(prompt).content.strip()
+            response = llm.invoke(prompt)
+            raw_response = response.content.strip()
+            
+            # Capture tokens for Monitoring Hub
+            if hasattr(response, "response_metadata"):
+                usage = response.response_metadata.get("token_usage", {})
+                state["last_token_usage"] = {
+                    "input": usage.get("prompt_tokens", 0),
+                    "output": usage.get("completion_tokens", 0)
+                }
+            
             # Handle potential markdown backticks
             if "```" in raw_response:
                 raw_response = raw_response.split("```")[1].replace("json", "").strip()

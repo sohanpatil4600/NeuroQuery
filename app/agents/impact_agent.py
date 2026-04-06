@@ -90,7 +90,10 @@ def get_operation_type(sql: str) -> str:
     # Default to write if not clearly read-only
     return "write"
 
+from app.utils.tracing import trace_agent
+
 # --- Main Impact Agent Function ---
+@trace_agent("impact")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Impact Agent: Analyzes SQL query for safety, PII exposure, and cost.

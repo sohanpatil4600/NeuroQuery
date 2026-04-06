@@ -8,7 +8,9 @@ DB_URL = os.getenv("DATABASE_URL", "sqlite:///enterprise_bi_db.sqlite")
 engine = create_engine(DB_URL)
 
 from sqlalchemy.exc import SQLAlchemyError
+from app.utils.tracing import trace_agent
 
+@trace_agent("execute")
 def run(state):
     # Initialize error and retry_count if not present
     if "error" not in state:

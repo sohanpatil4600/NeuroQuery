@@ -34,6 +34,9 @@ def init_rag():
             print(f"[RAG] Critical Error during init: {e}")
             embedder = "FAILED"
 
+from app.utils.tracing import trace_agent
+
+@trace_agent("rag")
 def run(state):
     try:
         init_rag()

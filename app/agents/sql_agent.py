@@ -1,4 +1,5 @@
 from app.utils.llm_factory import get_llm
+from app.utils.tracing import trace_agent
 import os
 from dotenv import load_dotenv
 
@@ -9,6 +10,7 @@ def get_agent_llm():
 
 from app.agents.vault import get_vault_entry
 
+@trace_agent("sql")
 def run(state):
     # --- ENTERPRISE QUERY JOIN VAULT (Instant Fallback & Performance) ---
     # Check if SQL was already set by metadata_agent vault check AND no error occurred
@@ -75,7 +77,16 @@ def run(state):
         
         Question: {state.get('corrected_question', state['question'])}
         SQL Query:"""
-        state["sql"] = llm.invoke(prompt).content.strip()
+        response = llm.invoke(prompt)
+        state["sql"] = response.content.strip()
+        
+        # Capture tokens for Monitoring Hub
+        if hasattr(response, "response_metadata"):
+            usage = response.response_metadata.get("token_usage", {})
+            state["last_token_usage"] = {
+                "input": usage.get("prompt_tokens", 0),
+                "output": usage.get("completion_tokens", 0)
+            }
         # Increment retry count
         state["retry_count"] = state.get("retry_count", 0) + 1
     else:

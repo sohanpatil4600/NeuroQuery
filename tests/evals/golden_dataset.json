@@ -1,0 +1,122 @@
+[
+    {
+        "id": 1,
+        "question": "What is the total revenue for the North region in 2024?",
+        "expected_sql": "SELECT SUM(revenue) FROM sales WHERE region = 'North' AND date LIKE '2024%'",
+        "category": "Basic Aggregation"
+    },
+    {
+        "id": 2,
+        "question": "Who are our top 5 customers by total spend?",
+        "expected_sql": "SELECT name, total_spend FROM customers ORDER BY total_spend DESC LIMIT 5",
+        "category": "Ranking"
+    },
+    {
+        "id": 3,
+        "question": "Show me the stock level of 'SaaS Pro' in the 'WH_Main' warehouse.",
+        "expected_sql": "SELECT quantity_on_hand FROM inventory i JOIN products p ON i.product_id = p.product_id WHERE p.name = 'SaaS Pro' AND i.warehouse_location = 'WH_Main'",
+        "category": "Join/Filtering"
+    },
+    {
+        "id": 4,
+        "question": "Which marketing channel had the highest ROI in 2025?",
+        "expected_sql": "SELECT channel, AVG(roi) as avg_roi FROM marketing WHERE date LIKE '2025%' GROUP BY channel ORDER BY avg_roi DESC LIMIT 1",
+        "category": "Aggregation/Grouping"
+    },
+    {
+        "id": 5,
+        "question": "How many active subscriptions do we have for the 'Elite' plan?",
+        "expected_sql": "SELECT COUNT(*) FROM subscriptions WHERE plan_name LIKE '%Elite%' AND status = 'Active'",
+        "category": "Filtering"
+    },
+    {
+        "id": 6,
+        "question": "What is the average resolution time for high priority support tickets?",
+        "expected_sql": "SELECT AVG(resolution_time_hrs) FROM support_tickets WHERE priority = 'High'",
+        "category": "Basic Aggregation"
+    },
+    {
+        "id": 7,
+        "question": "List departments that exceeded their budget in Q1 2024.",
+        "expected_sql": "SELECT department FROM operating_budget WHERE year = 2024 AND quarter = 'Q1' AND actual_spend > allocated_budget",
+        "category": "Filtering"
+    },
+    {
+        "id": 8,
+        "question": "Show monthly revenue trends for 2024.",
+        "expected_sql": "SELECT strftime('%m', date) as month, SUM(revenue) FROM sales WHERE date LIKE '2024%' GROUP BY month ORDER BY month",
+        "category": "Time Series"
+    },
+    {
+        "id": 9,
+        "question": "What is the churn rate for customers aged between 20 and 30?",
+        "expected_sql": "SELECT (CAST(COUNT(ca.churn_id) AS REAL) / COUNT(cu.customer_id)) * 100 FROM customers cu LEFT JOIN churn_analysis ca ON cu.customer_id = ca.customer_id WHERE cu.age BETWEEN 20 AND 30",
+        "category": "Complex Join/Ratio"
+    },
+    {
+        "id": 10,
+        "question": "Find the average rating for products in the 'Software' category.",
+        "expected_sql": "SELECT AVG(rating) FROM products WHERE category = 'Software'",
+        "category": "Basic Aggregation"
+    },
+    {
+        "id": 11,
+        "question": "Which employee has the highest actual sales in the Sales department?",
+        "expected_sql": "SELECT name, actual_sales FROM employee_performance WHERE department = 'Sales' ORDER BY actual_sales DESC LIMIT 1",
+        "category": "Ranking"
+    },
+    {
+        "id": 12,
+        "question": "How many website sessions came from 'Mobile' devices in 2025?",
+        "expected_sql": "SELECT SUM(sessions) FROM website_traffic WHERE device_type = 'Mobile' AND date LIKE '2025%'",
+        "category": "Filtering/Aggregation"
+    },
+    {
+        "id": 13,
+        "question": "What is the price gap between our 'SaaS Pro' and competitor prices?",
+        "expected_sql": "SELECT (p.base_price - cm.market_price) FROM products p JOIN competitor_metrics cm ON p.name = cm.product_name WHERE p.name = 'SaaS Pro'",
+        "category": "Join/Arithmetic"
+    },
+    {
+        "id": 14,
+        "question": "Show me the sentiment score of reviews for 'Enterprise Plan'.",
+        "expected_sql": "SELECT AVG(sentiment_score) FROM product_reviews pr JOIN products p ON pr.product_id = p.product_id WHERE p.name = 'Enterprise Plan'",
+        "category": "Join/Aggregation"
+    },
+    {
+        "id": 15,
+        "question": "List customers who canceled their subscription because of 'Price'.",
+        "expected_sql": "SELECT name FROM customers c JOIN subscriptions s ON c.customer_id = s.customer_id WHERE s.status = 'Canceled' AND s.churn_reason = 'Price'",
+        "category": "Join/Filtering"
+    },
+    {
+        "id": 16,
+        "question": "What was the total spend on 'Travel' expenses in 2024?",
+        "expected_sql": "SELECT SUM(amount) FROM expenses WHERE category = 'Travel' AND date LIKE '2024%'",
+        "category": "Aggregation/Filtering"
+    },
+    {
+        "id": 17,
+        "question": "Which region has the most active sales reps?",
+        "expected_sql": "SELECT name, active_reps FROM regions ORDER BY active_reps DESC LIMIT 1",
+        "category": "Ranking"
+    },
+    {
+        "id": 18,
+        "question": "How many products are currently below their reorder point?",
+        "expected_sql": "SELECT COUNT(DISTINCT product_id) FROM inventory WHERE quantity_on_hand < reorder_point",
+        "category": "Filtering/Count"
+    },
+    {
+        "id": 19,
+        "question": "Show the average production cost vs base price for each category.",
+        "expected_sql": "SELECT category, AVG(production_cost), AVG(base_price) FROM products GROUP BY category",
+        "category": "Grouping/Aggregation"
+    },
+    {
+        "id": 20,
+        "question": "Who signed up in 2025 and has a 'Gold' loyalty tier?",
+        "expected_sql": "SELECT name FROM customers WHERE signup_date LIKE '2025%' AND loyalty_tier = 'Gold'",
+        "category": "Filtering"
+    }
+]

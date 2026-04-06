@@ -18,15 +18,15 @@ def get_llm(model_type=None):
     
     if preferred == "openai" and openai_key:
         print("[LLM-FACTORY] Using OpenAI (Preferred)")
-        return ChatOpenAI(model="gpt-4o", openai_api_key=openai_key)
+        return ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, timeout=30)
     
     if groq_key and groq_key != "your_groq_key":
         print("[LLM-FACTORY] Using Groq (High Speed)")
-        return ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_key)
+        return ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_key, timeout=30)
     
     if openai_key:
         print("[LLM-FACTORY] Falling back to OpenAI")
-        return ChatOpenAI(model="gpt-4o", openai_api_key=openai_key)
+        return ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, timeout=30)
     
     print("[LLM-FACTORY] WARNING: No LLM API keys found!")
     return None

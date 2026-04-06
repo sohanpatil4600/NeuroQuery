@@ -5,8 +5,10 @@ import os
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'billing_db.sqlite')
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     cursor = conn.cursor()
+    cursor.execute('PRAGMA journal_mode=WAL;')
+    cursor.execute('PRAGMA synchronous=NORMAL;')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usage_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +38,7 @@ init_db()
 
 def record_usage(tenant_id, metric, value):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
         cursor = conn.cursor()
         now = datetime.utcnow().isoformat()
         cursor.execute(
@@ -55,7 +57,7 @@ def check_limit(tenant_id, metric, limit):
     Raises Exception if exceeded.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
         cursor = conn.cursor()
         # Ensure fast resolution of aggregate without date bounding for MVP
         cursor.execute(
@@ -78,7 +80,7 @@ def check_limit(tenant_id, metric, limit):
 
 def save_conversation(tenant_id, user_id, question, answer, sql_query, metadata_json):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
         cursor = conn.cursor()
         now = datetime.utcnow().isoformat()
         cursor.execute('''
@@ -93,7 +95,7 @@ def save_conversation(tenant_id, user_id, question, answer, sql_query, metadata_
 
 def get_conversation_history(tenant_id, user_id, limit=10):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT question, answer, sql_query, metadata_json, timestamp 

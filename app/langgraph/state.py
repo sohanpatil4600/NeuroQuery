@@ -3,6 +3,7 @@ from typing import TypedDict, Any, List
 class BIState(TypedDict):
     tenant_id: str
     user_id: str
+    request_id: str # Added for unique tracing/monitoring
     question: str
     corrected_question: str # Added to track AI normalization
     history: List[Any]
