@@ -16,6 +16,18 @@ def init_db():
             timestamp TEXT
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT,
+            user_id TEXT,
+            question TEXT,
+            answer TEXT,
+            sql_query TEXT,
+            metadata_json TEXT,
+            timestamp TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -63,3 +75,46 @@ def check_limit(tenant_id, metric, limit):
         print(f"[BILLING ERROR] check_limit failed: {e}")
         # Allow pass-through if DB fails so we don't block legitimate usage
         return True
+
+def save_conversation(tenant_id, user_id, question, answer, sql_query, metadata_json):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        now = datetime.utcnow().isoformat()
+        cursor.execute('''
+            INSERT INTO conversations (tenant_id, user_id, question, answer, sql_query, metadata_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (tenant_id, user_id, question, answer, sql_query, metadata_json, now))
+        conn.commit()
+        conn.close()
+        print(f"[CONVERSATION] Saved history for {user_id}")
+    except Exception as e:
+        print(f"[DB ERROR] save_conversation failed: {e}")
+
+def get_conversation_history(tenant_id, user_id, limit=10):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT question, answer, sql_query, metadata_json, timestamp 
+            FROM conversations 
+            WHERE tenant_id = ? AND user_id = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        ''', (tenant_id, user_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        history = []
+        for r in rows:
+            history.append({
+                "question": r[0],
+                "answer": r[1],
+                "sql": r[2],
+                "metadata": r[3],
+                "timestamp": r[4]
+            })
+        return history
+    except Exception as e:
+        print(f"[DB ERROR] get_conversation_history failed: {e}")
+        return []

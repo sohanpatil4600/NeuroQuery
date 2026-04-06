@@ -5,6 +5,7 @@ import plotly.express as px
 from datetime import datetime, timedelta, timezone
 import random
 import os
+import json
 try:
     from ui.render_utils import render_data_results
 except ImportError:
@@ -13,8 +14,11 @@ except ImportError:
 
 try:
     from seed_db import seed as seed_data
+    from app.billing.metering import save_conversation, get_conversation_history
 except ImportError:
     seed_data = None
+    save_conversation = None
+    get_conversation_history = None
 
 # Page Config
 st.set_page_config(
@@ -82,6 +86,68 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(114, 103, 239, 0.4);
     }
     .metric-card { background-color: #262730; padding: 20px; border-radius: 10px; border: 1px solid #41424C; text-align: center; }
+    
+    /* Rate Limit Overlay */
+    .rate-limit-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        z-index: 999999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.5s ease-in-out;
+    }
+    
+    .rate-limit-card {
+        background: #1e293b;
+        padding: 40px;
+        border-radius: 20px;
+        border: 2px solid #7267EF;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(114, 103, 239, 0.3);
+        max-width: 500px;
+        text-align: center;
+        animation: slideUp 0.4s ease-out;
+    }
+    
+    @keyframes slideUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .rate-limit-card h2 {
+        color: #ff4b4b !important;
+        margin-bottom: 20px;
+        font-size: 1.8rem;
+    }
+    
+    .rate-limit-card p {
+        color: #e2e8f0;
+        font-size: 1.1rem;
+        margin-bottom: 30px;
+        line-height: 1.6;
+    }
+    
+    .dismiss-btn {
+        background: linear-gradient(135deg, #7267EF 0%, #00D2FF 100%);
+        color: white;
+        padding: 12px 30px;
+        border-radius: 10px;
+        border: none;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: transform 0.2s;
+    }
+    
+    .dismiss-btn:hover {
+        transform: scale(1.05);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -91,6 +157,12 @@ def get_ist_time():
     utc_now = datetime.now(timezone.utc)
     ist_now = utc_now + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%Y-%m-%d %H:%M:%S IST")
+
+# Session State for Rate Limit
+if "show_rate_limit_error" not in st.session_state:
+    st.session_state.show_rate_limit_error = False
+if "rate_limit_error" not in st.session_state:
+    st.session_state.rate_limit_error = ""
 
 # Session State for Logs
 if "system_logs" not in st.session_state:
@@ -166,6 +238,53 @@ with st.sidebar:
     except FileNotFoundError:
         st.warning("Prompts file not found.")
 
+    st.markdown("---")
+    
+    # 4. Conversation History
+    st.markdown("### 📜 Recent Analysis")
+    if get_conversation_history:
+        history = get_conversation_history("t1", "u1", limit=5)
+        if history:
+            for item in history:
+                with st.expander(f"🕒 {item['timestamp'][:10]} | {item['question'][:30]}..."):
+                    st.write(f"**Q:** {item['question']}")
+                    st.write(f"**SQL:**")
+                    st.code(item['sql'], language="sql")
+                    if st.button("🔄 Reload Analysis", key=f"reload_{item['timestamp']}"):
+                         st.session_state.main_query_input = item['question']
+                         # We don't rerun here, but the user can then click Analyze
+        else:
+            st.caption("No history found.")
+
+    st.markdown("---")
+    
+    # 5. Memory & Vault Management
+    st.markdown("### ⚙️ System Management")
+    with st.expander("🗑️ Destructive Actions", expanded=False):
+        st.warning("These actions cannot be undone!")
+        
+        if st.button("🔴 Clear Long-Term Memory", use_container_width=True, help="Wipe all personal user facts from Mem0 (Qdrant)"):
+            try:
+                res = requests.post("http://localhost:8000/memory/clear", json={"user_id": "u1"})
+                if res.status_code == 200:
+                    st.success("✅ Memory Wiped Successfully!")
+                    log_event("Memory Clear", "User manually cleared long-term memory.")
+                else:
+                    st.error("❌ Failed to clear memory.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+        if st.button("⚡ Clear Semantic Vault", use_container_width=True, help="Wipe all cached SQL shortcuts from the persistent vault"):
+            try:
+                res = requests.post("http://localhost:8000/vault/clear")
+                if res.status_code == 200:
+                    st.success("✅ Vault Cleared Successfully!")
+                    log_event("Vault Clear", "User manually cleared the semantic vault.")
+                else:
+                    st.error("❌ Failed to clear vault.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
 
 
 
@@ -204,6 +323,33 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
+
+# --- RATE LIMIT OVERLAY ---
+if st.session_state.get("show_rate_limit_error"):
+    error_details = st.session_state.rate_limit_error
+    # Extract cleaner message if it's a Groq 429
+    if "429" in error_details:
+        display_msg = "The AI provider (Groq) has reached its daily token limit. Please wait a few minutes or upgrade your tier."
+    else:
+        display_msg = "An unexpected error occurred during analysis. Please try again."
+
+    st.markdown(f"""
+        <div class="rate-limit-overlay">
+            <div class="rate-limit-card">
+                <div style="font-size: 3rem; margin-bottom: 10px;">⚠️</div>
+                <h2>Rate Limit Reached</h2>
+                <p>{display_msg}</p>
+                <div style="margin-top: 20px;">
+                    <button class="dismiss-btn" onclick="window.location.reload()">Return to Dashboard</button>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Hidden button backup for state clearing
+    if st.button("Dismiss Overlay", key="dismiss_rate_limit_fallback"):
+        st.session_state.show_rate_limit_error = False
+        st.rerun()
 
 # Tabs
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -611,124 +757,121 @@ with tab1:
 
     # Logic for handling query submission (Callback to safely clear input)
     def submit_query():
-        q = st.session_state.main_query_input
-        if not q:
+        if not st.session_state.main_query_input:
             st.warning("Please enter a valid query.")
             return
+        # Store for processing before clearing the widget
+        st.session_state.current_query = st.session_state.main_query_input
+        st.session_state.main_query_input = "" 
+        st.session_state.start_streaming = True
+        st.session_state.show_result = False
 
-        log_event("Query Initiated", f"Question: {q}")
+    # Add a state for streaming
+    if "start_streaming" not in st.session_state:
+        st.session_state.start_streaming = False
+
+    # --- STREAMING EXECUTION BLOCK ---
+    if st.session_state.start_streaming:
+        st.session_state.start_streaming = False # Reset immediately
+        q = st.session_state.get("current_query", "")
+        log_event("Query Initiated (Stream)", f"Question: {q}")
         
-        # Mock Response Class
-        class MockResponse:
-            def __init__(self, json_data, status_code=200):
-                self._json = json_data
-                self.status_code = status_code
-            def json(self): return self._json
+        # Mapping for user-friendly node names
+        node_labels = {
+            "metadata": "🔍 Analyzing Intent & Normalizing Query...",
+            "rag": "🕸️ Fetching Business Rules & Domain Context...",
+            "sql": "📝 Generating Enterprise SQL Query...",
+            "impact": "🛡️ Performing Security & Governance Scan...",
+            "execute": "⚙️ Executing Secure SQL Transaction...",
+            "bi": "📊 Synthesizing BI Insights & Visuals..."
+        }
 
         try:
-            # 3. Robust Backend Call
-            try:
-                # Pass history for context
+            with st.status("🚀 Agentic Swarm Initializing...", expanded=True) as status:
+                st.write("📡 Connecting to NeuroQuery Intelligence Engine...")
+                
+                # Build context
                 history_context = []
                 for turn in st.session_state.chat_history[-5:]:
                     history_context.append(f"User: {turn['user']}")
                     history_context.append(f"AI: {turn['ai']}")
-                    
-                response = requests.post("http://localhost:8000/ask", json={
-                    "tenant_id": "t1", "user_id": "u1", "question": q, "history": history_context
-                }, timeout=10)
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-                # Fallback to Direct Agent Execution (Streamlit Cloud mode)
-                log_event("Backend Unavailable", "Running agents locally in Streamlit")
-                
+
                 try:
-                    # Import the LangGraph orchestration directly
-                    import sys
-                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-                    from app.langgraph.graph import bi_graph
-                    from app.billing.metering import record_usage, check_limit
+                    # 1. Call the new Streaming Endpoint
+                    response = requests.post("http://localhost:8000/ask/stream", json={
+                        "tenant_id": "t1", "user_id": "u1", "question": q, "history": history_context
+                    }, stream=True, timeout=30)
                     
-                    # Enforce billing hard-limit before spending LLM tokens locally
-                    check_limit("t1", "query", 50)
-                    
-                    # Run agents directly using the compiled graph
-                    result = bi_graph.invoke({
-                        "tenant_id": "t1",
-                        "user_id": "u1", 
-                        "question": q,
-                        "history": history_context
-                    })
-                    
-                    # Record usage
-                    record_usage("t1", "query", 1)
-                    
-                    # Extract response
-                    response = MockResponse(result.get("response", result))
-                    log_event("Query Success", "Direct Agent Execution Completed Successfully")
-                    log_event("Local Agents Success", f"Processed query: {q[:50]}...")
-                    
-                except Exception as agent_error:
-                    # If agents also fail, show error to user
-                    import traceback
-                    error_details = traceback.format_exc()
-                    log_event("Agent Error", f"{str(agent_error)}\n{error_details[:200]}")
-                    st.error(f"⚠️ **Error running AI agents:** {str(agent_error)}")
-                    st.session_state.show_result = False
-                    return
+                    if response.status_code == 200:
+                        last_node = ""
+                        data = None
+                        
+                        for line in response.iter_lines():
+                            if line:
+                                chunk = json.loads(line.decode('utf-8'))
+                                
+                                if chunk.get("status") == "error":
+                                    st.session_state.rate_limit_error = chunk.get("error", "Unknown error occurred.")
+                                    st.session_state.show_rate_limit_error = True
+                                    status.update(label="❌ Analysis Failed", state="error", expanded=False)
+                                    break
 
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check for backend-level errors (like 429 Rate Limits from LLM)
-                if "error" in data:
-                    st.error(f"⚠️ **AI Agent Error:** {data['error']}")
-                    log_event("Query Error", f"Backend reported: {data['error'][:100]}")
-                    st.session_state.show_result = False
-                    return
+                                if chunk.get("status") == "done":
+                                    data = chunk.get("full_data")
+                                    status.update(label="✅ Analysis Complete!", state="complete", expanded=False)
+                                    break
+                                
+                                node = chunk.get("node")
+                                if node in node_labels:
+                                    status.write(node_labels[node])
+                                    if chunk.get("state_update", {}).get("retry_count", 0) > 0:
+                                        st.toast(f"🔄 Self-Healing Active (Attempt {chunk['state_update']['retry_count']})", icon="🔧")
+                        
+                        # Process the data we got from the stream
+                        if data:
+                            if "error" in data:
+                                err_msg = data['error']
+                                if "429" in err_msg or "rate limit" in err_msg.lower():
+                                    st.warning("⚠️ **Groq Rate Limit Reached:** The AI provider is temporarily busy. Please wait 1-2 minutes and try again. (Dev Tier limits apply)")
+                                else:
+                                    st.error(f"⚠️ AI Error: {err_msg}")
+                            else:
+                                kpis = data.get("kpis", {})
+                                reasoning = data.get("reasoning", "Analysis optimized.")
+                                metric_label = kpis.get('primary_label', 'Records')
+                                metric_val = kpis.get('primary_val', 0)
+                                
+                                formatted_val = f"${metric_val:,.2f}" if any(x in metric_label.lower() for x in ['revenue', 'sales', 'spend', 'price', 'budget']) else f"{metric_val:,.0f}"
+                                ai_message = f"{reasoning}\n\n**Key Metric ({metric_label}):** {formatted_val}"
+                                
+                                st.session_state.chat_history.append({
+                                    "user": q, 
+                                    "ai": ai_message,
+                                    "full_data": data 
+                                })
+                                
+                                # SAVE TO PERSISTENT HISTORY
+                                if save_conversation:
+                                    save_conversation("t1", "u1", q, ai_message, data.get("sql", ""), json.dumps(data))
+                                
+                                st.session_state.query_result = data
+                                st.session_state.show_result = True
+                                st.rerun()
+                    else:
+                        st.error(f"Backend Error: {response.status_code}")
+                        st.session_state.start_streaming = False
 
-                log_event("Query Success", "Received 200 OK from Backend")
-                
-                # Build User/AI turn
-                kpis = data.get("kpis", {})
-                reasoning = data.get("reasoning", "Analysis optimized and completed successfully.")
-                metric_label = kpis.get('primary_label', 'Records')
-                metric_val = kpis.get('primary_val', 0)
-                
-                formatted_val = f"${metric_val:,.2f}" if any(x in metric_label.lower() for x in ['revenue', 'sales', 'spend', 'price', 'budget']) else f"{metric_val:,.0f}"
-                ai_message = f"{reasoning}\n\n**Key Metric ({metric_label}):** {formatted_val}"
-                
-                # STORE IN HISTORY
-                st.session_state.chat_history.append({
-                    "user": q, 
-                    "ai": ai_message,
-                    "full_data": data 
-                })
-                
-                st.session_state.query_result = data
-                st.session_state.show_result = True
-                st.session_state.main_query_input = "" # Clear input safely
-                
-            else:
-                st.error(f"Error {response.status_code}: {response.text}")
-                log_event("Query Error", f"Status: {response.status_code}")
-                st.session_state.show_result = False
-                
+                except Exception as e:
+                    err_str = str(e)
+                    if "429" in err_str or "rate limit" in err_str.lower():
+                         st.session_state.rate_limit_error = err_str
+                         st.session_state.show_rate_limit_error = True
+                    else:
+                        st.error(f"Streaming Error: {e}")
+                    st.session_state.start_streaming = False
+
         except Exception as e:
-            # Handle Simulation fallback errors if strictly needed, or generic error
-            if SIMULATION_MODE:
-                 # Simplified simulation fallback for generic errors
-                 st.session_state.chat_history.append({
-                     "user": q, 
-                     "ai": "Simulated Response: Analysis Complete.",
-                     "full_data": {"kpis": {}, "data": []}
-                 })
-                 st.session_state.show_result = True
-                 st.session_state.main_query_input = ""
-            else: 
-                log_event("Connection Error", str(e))
-                # We can't show st.error easily in callback so we use toast or just let it pass to main
-                # ideally we set a state to show error
-                st.session_state.last_error = str(e)
+            st.error(f"System Error: {e}")
 
     analyze_clicked = btn_col1.button("🚀 Analyze Data", use_container_width=True, on_click=submit_query)
     enter_clicked = btn_col2.button("✅ Enter", use_container_width=True, on_click=submit_query)

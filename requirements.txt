@@ -13,3 +13,4 @@ python-dotenv
 requests
 sentence-transformers
 qdrant-client
+langchain-openai

@@ -35,6 +35,12 @@ def run(state):
     except (ValueError, TypeError):
         final_val = 0.0
 
+    # --- REFLEXION AWARENESS (Self-Healing) ---
+    retry_tag = ""
+    retry_count = state.get("retry_count", 0)
+    if retry_count > 0:
+        retry_tag = f"\n- **🔄 Self-Healing Active:** Successfully auto-corrected SQL syntax after {retry_count} attempt(s)."
+
     cache_tag = " ⚡ [Smart Cache Hit]" if state.get("from_vault") else ""
     state["response"] = {
         "kpis": {
@@ -48,7 +54,7 @@ def run(state):
         "reasoning": (
             f"### Analysis Summary{cache_tag}\n"
             f"- **Interpreted Query:** \"{state.get('corrected_question', state['question'])}\"\n"
-            f"- **Data Scoped:** Analyzed {len(df)} relevant records from the database.\n"
+            f"- **Data Scoped:** Analyzed {len(df)} relevant records.{retry_tag}\n"
             f"- **Sources:** Information retrieved from the following modules: {', '.join(state.get('metadata', {}).get('tables', ['Enterprise Core']))}.\n"
             f"- **Metric Calculation:** Calculated **{primary_metric_name}** as the primary business indicator.\n"
             f"- **Accuracy:** Results have been verified against the 2023-2026 data range.\n"
@@ -76,11 +82,19 @@ def run(state):
         except Exception as e:
             print(f"[BI-LEARN] Warning: Could not cache query: {e}")
 
+    # --- DYNAMIC LEARNING LOOP (Long-Term Memory) ---
     try:
         memory = get_memory()
-        memory_content = f"User Question: {state['question']} | AI Insight: {primary_metric_name} was {final_val:,.2f}"
+        # Ensure we capture the raw question and the resulting insight
+        # Mem0 will use its internal LLM (Groq/OpenAI) to extract permanent facts from this string.
+        memory_content = (
+            f"User Interaction:\n"
+            f"- Question/Statement: {state['question']}\n"
+            f"- Data Insight Found: {primary_metric_name} was {final_val:,.2f}\n"
+            f"- Reasoning: {state['response'].get('reasoning', '')[:200]}..."
+        )
         memory.add(memory_content, user_id=state["user_id"])
-        print(f"[MEMORY] Successfully stored interaction for {state['user_id']}")
+        print(f"[MEMORY] Successfully synced fact to Mem0 for {state['user_id']}")
     except Exception as e:
-        print(f"Memory warning: {e}")
+        print(f"Memory sync warning: {e}")
     return state

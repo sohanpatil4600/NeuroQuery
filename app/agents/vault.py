@@ -100,6 +100,25 @@ def add_to_vault(question, sql, tables, is_verified=True):
         print(f"[VAULT] Failed to add to vault: {e}")
         return False
 
+def clear_vault():
+    """Wipe the entire persistent vault and reset the cache."""
+    try:
+        conn = sqlite3.connect(VAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM vault")
+        conn.commit()
+        conn.close()
+        # Reset memory-based caches
+        global vault_keys, vault_data, vault_embeddings
+        vault_keys = []
+        vault_data = {}
+        vault_embeddings = None
+        print("[VAULT] Persistent vault cleared and cache reset.")
+        return True
+    except Exception as e:
+        print(f"[VAULT] Failed to clear: {e}")
+        return False
+
 def get_vault_entry(question):
     """Retrieve a verified query pair using exact or semantic matching."""
     q = question.strip().lower().rstrip('.')

@@ -1,22 +1,10 @@
 from app.memory.mem0_client import get_memory
-from langchain_groq import ChatGroq
+from app.utils.llm_factory import get_llm
 import os
 from app.agents.vault import get_vault_entry
 
 def run(state):
-    # 0. Check Vault First (Short Circuit Groq)
-    entry = get_vault_entry(state["question"])
-    if entry:
-        state["metadata"] = {
-            "tables": entry["tables"],
-            "columns": ["*"]
-        }
-        state["sql"] = entry["sql"] # Pre-load SQL to skip sql_agent block
-        state["from_vault"] = True
-        print(f"[VAULT] Shortcut activated for: {state['question']}")
-        return state
-
-    # 1. Memory Context
+    # 1. Memory Context (Now Priority #1)
     mem_context = ""
     try:
         memory = get_memory()
@@ -35,10 +23,22 @@ def run(state):
     except Exception as e:
         print(f"Memory warning: {e}")
 
-    # 2. Dynamic Router LLM
-    api_key = os.getenv("GROQ_API_KEY")
-    if api_key and api_key != "your_groq_key":
-        llm = ChatGroq(model="llama-3.3-70b-versatile")
+    # 2. Check Vault (Now Priority #2 - Only if no personalized memory exists)
+    # We skip vault if we have relevant user context to avoid generic cached answers overriding personal facts
+    if not mem_context:
+        entry = get_vault_entry(state["question"])
+        if entry:
+            state["metadata"] = {
+                "tables": entry["tables"],
+                "columns": ["*"]
+            }
+            state["sql"] = entry["sql"] # Pre-load SQL to skip sql_agent block
+            state["from_vault"] = True
+            print(f"[VAULT] Shortcut activated for: {state['question']}")
+            return state
+
+    llm = get_llm()
+    if llm:
         prompt = f"""
         You are a Metadata Router & Query Interpreter. 
         Your job is to identify the correct database tables and NORMALIZE the question even if it has typos or is incomplete.

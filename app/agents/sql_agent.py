@@ -1,14 +1,11 @@
-from langchain_groq import ChatGroq
+from app.utils.llm_factory import get_llm
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_llm():
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key or api_key == "your_groq_key":
-        return None
-    return ChatGroq(model="llama-3.3-70b-versatile")
+def get_agent_llm():
+    return get_llm()
 
 from app.agents.vault import get_vault_entry
 
@@ -29,7 +26,7 @@ def run(state):
     
     state["from_vault"] = False
 
-    llm = get_llm()
+    llm = get_agent_llm()
     if llm:
         prompt = f"""
         You are an Enterprise BI Expert. Generate only the SQL query for the following question.
