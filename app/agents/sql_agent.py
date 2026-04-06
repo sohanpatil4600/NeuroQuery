@@ -17,13 +17,17 @@ def run(state):
     # Check if SQL was already set by metadata_agent vault check AND no error occurred
     if "sql" in state and state["sql"] and not state.get("error"):
         print(f"[VAULT] SQL already set for: {state['question']}")
+        state["from_vault"] = True
         return state
 
     # Direct check just in case
     entry = get_vault_entry(state["question"])
     if entry:
         state["sql"] = entry["sql"]
+        state["from_vault"] = True
         return state
+    
+    state["from_vault"] = False
 
     llm = get_llm()
     if llm:

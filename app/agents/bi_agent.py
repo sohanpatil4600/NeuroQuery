@@ -1,5 +1,6 @@
 import pandas as pd
 from app.memory.mem0_client import get_memory
+from app.agents.vault import add_to_vault
 
 def run(state):
     df = pd.DataFrame(state["result"])
@@ -34,6 +35,7 @@ def run(state):
     except (ValueError, TypeError):
         final_val = 0.0
 
+    cache_tag = " ⚡ [Smart Cache Hit]" if state.get("from_vault") else ""
     state["response"] = {
         "kpis": {
             "primary_val": final_val,
@@ -44,7 +46,7 @@ def run(state):
         "data": df.to_dict("records"),
         "sql": state["sql"],
         "reasoning": (
-            f"### Analysis Summary\n"
+            f"### Analysis Summary{cache_tag}\n"
             f"- **Interpreted Query:** \"{state.get('corrected_question', state['question'])}\"\n"
             f"- **Data Scoped:** Analyzed {len(df)} relevant records from the database.\n"
             f"- **Sources:** Information retrieved from the following modules: {', '.join(state.get('metadata', {}).get('tables', ['Enterprise Core']))}.\n"
@@ -54,6 +56,26 @@ def run(state):
         )
     }
     
+    # --- DYNAMIC LEARNING LOOP ---
+    # If the query was successful, NOT from vault, and produced data -> Cache it!
+    if not df.empty and not state.get("from_vault", False):
+        try:
+            # Check if it was "Auto-Self-Healed"
+            retry_count = state.get("retry_count", 0)
+            log_tag = " [Auto-Self-Healed]" if retry_count > 1 else ""
+            
+            tables_used = state.get("metadata", {}).get("tables", ["Unknown"])
+            success = add_to_vault(
+                question=state["question"],
+                sql=state["sql"],
+                tables=tables_used,
+                is_verified=True # Auto-learned queries are trusted in this demo
+            )
+            if success:
+                print(f"[BI-LEARN] Cached new successful query to Persistent Vault{log_tag}.")
+        except Exception as e:
+            print(f"[BI-LEARN] Warning: Could not cache query: {e}")
+
     try:
         memory = get_memory()
         memory_content = f"User Question: {state['question']} | AI Insight: {primary_metric_name} was {final_val:,.2f}"

@@ -1,3 +1,6 @@
+from app.utils.logger_utils import silence_ai_noise
+silence_ai_noise()
+
 from fastapi import FastAPI
 from app.langgraph.graph import bi_graph
 from app.billing.metering import record_usage, check_limit

@@ -12,6 +12,7 @@ def run(state):
             "columns": ["*"]
         }
         state["sql"] = entry["sql"] # Pre-load SQL to skip sql_agent block
+        state["from_vault"] = True
         print(f"[VAULT] Shortcut activated for: {state['question']}")
         return state
 

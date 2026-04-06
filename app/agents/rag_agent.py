@@ -1,7 +1,11 @@
+from app.utils.logger_utils import silence_ai_noise
+silence_ai_noise()
+
 import os
 import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
+import logging
 
 # Lazy load Embedder to avoid blocking startup
 embedder = None
@@ -23,7 +27,7 @@ def init_rag():
                 
                 if glossary_lines:
                     print(f"[RAG] Embedding {len(glossary_lines)} business rules in-memory...")
-                    glossary_embeddings = embedder.encode(glossary_lines, convert_to_tensor=True)
+                    glossary_embeddings = embedder.encode(glossary_lines, convert_to_tensor=True, show_progress_bar=False)
             else:
                 print(f"[RAG] Warning: Glossary file not found at {glossary_path}")
         except Exception as e:
@@ -41,7 +45,7 @@ def run(state):
             return state
 
         # Embed question
-        q_emb = embedder.encode(question, convert_to_tensor=True)
+        q_emb = embedder.encode(question, convert_to_tensor=True, show_progress_bar=False)
         
         # Calculate cosine similarity against all rules
         cos_scores = F.cosine_similarity(q_emb.unsqueeze(0), glossary_embeddings)

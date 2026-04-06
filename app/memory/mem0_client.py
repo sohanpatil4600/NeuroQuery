@@ -1,6 +1,10 @@
+from app.utils.logger_utils import silence_ai_noise
+silence_ai_noise()
+
 import os
 from mem0 import Memory
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 
