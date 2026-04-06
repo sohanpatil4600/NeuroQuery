@@ -69,15 +69,22 @@ def render_data_results(data, turn_index=0):
     </div>
     """, unsafe_allow_html=True)
 
-    # Charts and Table (Full Width)
+    # --- DYNAMIC CHART RENDERING (Respecting BI Agent visual_config) ---
+    visual_config = data.get("visual_config", {})
     df = pd.DataFrame(data.get("data", []))
     c1, c2 = st.columns([2, 1])
     
     with c1:
-        if not df.empty:
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
-            cat_cols = df.select_dtypes(include=['object']).columns.tolist()
-            
+        if df.empty:
+            st.info("No data available for visualization.")
+        else:
+            chart_type = visual_config.get("chart_type")
+            title = visual_config.get("title", "Data Analysis")
+            x_col = visual_config.get("x")
+            y_col = visual_config.get("y")
+            color_col = visual_config.get("color")
+            labels = visual_config.get("labels", {})
+
             chart_theme = {
                 "layout": {
                     "paper_bgcolor": "rgba(0,0,0,0)",
@@ -87,64 +94,72 @@ def render_data_results(data, turn_index=0):
                 }
             }
 
-            if len(df) == 1 and num_cols:
-                if len(num_cols) > 1:
-                    comparison_df = df[num_cols].T.reset_index()
-                    comparison_df.columns = ['Metric', 'Value']
-                    comparison_df['Metric'] = comparison_df['Metric'].str.replace('_', ' ').str.title()
-                    
-                    fig = px.bar(comparison_df, x='Metric', y='Value', color='Metric', 
-                               text_auto='.2s', color_discrete_sequence=px.colors.qualitative.Pastel)
-                    fig.update_layout(chart_theme["layout"], title="Comparison Analysis")
-                    st.plotly_chart(fig, use_container_width=True, key=f"chart_comparison_{turn_index}")
-                elif len(num_cols) == 1:
-                    val = df[num_cols[0]].iloc[0]
-                    col_name = num_cols[0].replace('_', ' ').title()
-                    if any(x in col_name.lower() for x in ['revenue', 'sales', 'total', 'price', 'amount']):
-                        formatted_val = f"${val:,.2f}"
-                    else:
-                        formatted_val = f"{val:,.2f}" if isinstance(val, (int, float)) else val
-                    st.markdown(f"""
-                    <div style='background: linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(41, 128, 185, 0.05) 100%); 
-                                padding: 40px; border-radius: 15px; border: 1px solid rgba(52, 152, 219, 0.2); 
-                                text-align: center; margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);'>
-                        <h2 style='color: #3498db; font-size: 1.2rem; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: 2px;'>{col_name}</h2>
-                        <p style='color: #ffffff; font-size: 3.5rem; font-weight: 800; margin: 15px 0;'>{formatted_val}</p>
-                        <div style='display: inline-block; padding: 5px 15px; background: rgba(46, 204, 113, 0.2); color: #2ecc71; border-radius: 20px; font-size: 0.9rem; font-weight: 600;'>
-                            ✨ AI Computed Successfully
-                        </div>
+            # 1. Metric View (Single Value)
+            if chart_type == "metric" or (len(df) == 1 and not x_col):
+                val = df[y_col].iloc[0] if y_col in df.columns else (df.select_dtypes(include=['number']).iloc[0,0] if not df.select_dtypes(include=['number']).empty else 0)
+                col_name = (y_col or "Metric").replace('_', ' ').title()
+                is_currency = any(x in col_name.lower() for x in ['revenue', 'sales', 'total', 'price', 'amount', 'budget'])
+                formatted_val = f"${val:,.2f}" if is_currency else (f"{val:,.0f}" if isinstance(val, (int, float)) else val)
+                
+                st.markdown(f"""
+                <div style='background: linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(41, 128, 185, 0.05) 100%); 
+                            padding: 40px; border-radius: 15px; border: 1px solid rgba(52, 152, 219, 0.2); 
+                            text-align: center; margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);'>
+                    <h2 style='color: #3498db; font-size: 1.2rem; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: 2px;'>{col_name}</h2>
+                    <p style='color: #ffffff; font-size: 3.5rem; font-weight: 800; margin: 15px 0;'>{formatted_val}</p>
+                    <div style='display: inline-block; padding: 5px 15px; background: rgba(46, 204, 113, 0.2); color: #2ecc71; border-radius: 20px; font-size: 0.9rem; font-weight: 600;'>
+                        ✨ AI Computed Successfully
                     </div>
-                    """, unsafe_allow_html=True)
-            
-            elif "region" in df.columns and "revenue" in df.columns:
-                    fig = px.pie(df, values='revenue', names='region', hole=.5, 
-                                 color_discrete_sequence=px.colors.qualitative.Prism)
-                    fig.update_layout(chart_theme["layout"], title="Revenue Distribution by Region")
-                    fig.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#1e1e1e', width=2)))
-                    st.plotly_chart(fig, use_container_width=True, key=f"chart_pie_{turn_index}")
-            
-            elif cat_cols and num_cols:
-                fig = px.bar(df, x=cat_cols[0], y=num_cols[0], 
-                           color=num_cols[0], color_continuous_scale='Blues')
-                fig.update_layout(chart_theme["layout"], title=f"Analysis: {num_cols[0].title()} by {cat_cols[0].title()}")
-                fig.update_traces(marker_line_color='rgba(0,0,0,0)', marker_line_width=0, opacity=0.9)
+                </div>
+                """, unsafe_allow_html=True)
+
+            # 2. Pie Chart
+            elif chart_type == "pie":
+                fig = px.pie(df, values=y_col, names=x_col, hole=visual_config.get("hole", 0.5), 
+                             color_discrete_sequence=px.colors.qualitative.Prism)
+                fig.update_layout(chart_theme["layout"], title=title)
+                fig.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#1e1e1e', width=2)))
+                st.plotly_chart(fig, use_container_width=True, key=f"chart_pie_{turn_index}")
+
+            # 3. Bar Chart
+            elif chart_type == "bar":
+                fig = px.bar(df, x=x_col, y=y_col, color=color_col or y_col, 
+                           labels=labels, color_continuous_scale='Blues')
+                fig.update_layout(chart_theme["layout"], title=title)
                 st.plotly_chart(fig, use_container_width=True, key=f"chart_bar_{turn_index}")
 
-            elif cat_cols and not num_cols:
-                viz_df = df.copy()
-                target_col = cat_cols[0]
-                viz_df = viz_df[target_col].value_counts().reset_index()
-                viz_df.columns = [target_col, 'Count']
-                fig = px.bar(viz_df, x='Count', y=target_col, orientation='h',
-                           color='Count', color_continuous_scale='Viridis', text_auto=True)
-                fig.update_layout(chart_theme["layout"], title=f"Frequency Distribution: {target_col.title()}")
-                fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, use_container_width=True, key=f"chart_freq_{turn_index}")
-                
+            # 4. Line Chart
+            elif chart_type == "line":
+                fig = px.line(df, x=x_col, y=y_col, color=color_col, markers=True,
+                            labels=labels, color_discrete_sequence=px.colors.qualitative.Safe)
+                fig.update_layout(chart_theme["layout"], title=title)
+                st.plotly_chart(fig, use_container_width=True, key=f"chart_line_{turn_index}")
+
+            # 5. Scatter Plot
+            elif chart_type == "scatter":
+                fig = px.scatter(df, x=x_col, y=y_col, color=color_col, size=y_col,
+                               labels=labels, color_continuous_scale='Viridis')
+                fig.update_layout(chart_theme["layout"], title=title)
+                st.plotly_chart(fig, use_container_width=True, key=f"chart_scatter_{turn_index}")
+
+            # 6. Fallback Guessing Logic (Backward Compatibility)
             else:
-                st.dataframe(df, use_container_width=True)
-        else:
-            st.info("No data available for visualization.")
+                num_cols = df.select_dtypes(include=['number']).columns.tolist()
+                cat_cols = df.select_dtypes(include=['object']).columns.tolist()
+                
+                if len(df) == 1 and num_cols:
+                    st.info("Displaying as Data Table")
+                    st.dataframe(df, use_container_width=True)
+                elif "region" in df.columns and "revenue" in df.columns:
+                    fig = px.pie(df, values='revenue', names='region', hole=.5)
+                    fig.update_layout(chart_theme["layout"], title="Revenue by Region")
+                    st.plotly_chart(fig, use_container_width=True)
+                elif cat_cols and num_cols:
+                    fig = px.bar(df, x=cat_cols[0], y=num_cols[0], color=num_cols[0])
+                    fig.update_layout(chart_theme["layout"], title=f"{num_cols[0].title()} by {cat_cols[0].title()}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.dataframe(df, use_container_width=True)
             
     with c2:
         st.dataframe(df, use_container_width=True, height=400)

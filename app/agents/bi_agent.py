@@ -1,6 +1,8 @@
 import pandas as pd
+import json
 from app.memory.mem0_client import get_memory
 from app.agents.vault import add_to_vault
+from app.utils.llm_factory import get_llm
 
 def run(state):
     df = pd.DataFrame(state["result"])
@@ -29,6 +31,53 @@ def run(state):
             primary_metric_name = "Total Records"
             primary_metric_val = len(df)
 
+    # --- DYNAMIC VISUALIZATION CONFIG (The "BI" Agent Brain) ---
+    visual_config = {}
+    try:
+        llm = get_llm()
+        if llm and not df.empty:
+            schema = df.dtypes.to_dict()
+            sample_data = df.head(5).to_dict("records")
+            
+            prompt = f"""
+            You are a Senior BI Analyst. Analyze the following data and the user's question to recommend the PERFECT visualization.
+            
+            USER QUESTION: "{state['question']}"
+            DATA SCHEMA: {schema}
+            DATA SAMPLE (Top 5): {sample_data}
+            
+            RULES:
+            1. If the data is time-based (e.g., has 'date', 'month', 'year'), prefer a 'line' chart.
+            2. If comparing categories (e.g., 'region', 'department'), prefer a 'bar' or 'pie' chart.
+            3. If looking for correlations between two numeric values, prefer a 'scatter' plot.
+            4. If there's only one record or one metric, prefer 'metric'.
+            5. Return ONLY a JSON object with this structure:
+            {{
+                "chart_type": "bar" | "pie" | "line" | "scatter" | "metric",
+                "x": "column_name_for_x_axis",
+                "y": "column_name_for_y_axis",
+                "color": "column_name_for_color_split" or null,
+                "title": "Business-focused title for the chart",
+                "hole": 0.5 (only if pie),
+                "labels": {{"x": "Custom X Axis Label", "y": "Custom Y Axis Label"}}
+            }}
+            """
+            
+            # Simple direct prompt call for efficiency
+            response = llm.invoke(prompt)
+            content = response.content
+            # Clean up potential markdown formatting
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+                
+            visual_config = json.loads(content)
+            print(f"[BI-AGENT] Generated Visual Config: {visual_config['chart_type']} - {visual_config['title']}")
+    except Exception as e:
+        print(f"[BI-AGENT] Warning: Visualization analysis failed: {e}")
+        visual_config = {"error": str(e)}
+
     # Final safety check on casting to float
     try:
         final_val = float(primary_metric_val) if primary_metric_val is not None else 0.0
@@ -50,6 +99,7 @@ def run(state):
             "yoy": "8.2%"
         },
         "data": df.to_dict("records"),
+        "visual_config": visual_config,
         "sql": state["sql"],
         "reasoning": (
             f"### Analysis Summary{cache_tag}\n"
@@ -57,16 +107,15 @@ def run(state):
             f"- **Data Scoped:** Analyzed {len(df)} relevant records.{retry_tag}\n"
             f"- **Sources:** Information retrieved from the following modules: {', '.join(state.get('metadata', {}).get('tables', ['Enterprise Core']))}.\n"
             f"- **Metric Calculation:** Calculated **{primary_metric_name}** as the primary business indicator.\n"
+            f"- **Visualization:** AI selected **{visual_config.get('chart_type', 'Default').upper()}** view as the most optimal format.\n"
             f"- **Accuracy:** Results have been verified against the 2023-2026 data range.\n"
             f"- **Next Steps:** You can refine this by asking for a breakdown by region or time period."
         )
     }
     
     # --- DYNAMIC LEARNING LOOP ---
-    # If the query was successful, NOT from vault, and produced data -> Cache it!
     if not df.empty and not state.get("from_vault", False):
         try:
-            # Check if it was "Auto-Self-Healed"
             retry_count = state.get("retry_count", 0)
             log_tag = " [Auto-Self-Healed]" if retry_count > 1 else ""
             
@@ -75,7 +124,7 @@ def run(state):
                 question=state["question"],
                 sql=state["sql"],
                 tables=tables_used,
-                is_verified=True # Auto-learned queries are trusted in this demo
+                is_verified=True 
             )
             if success:
                 print(f"[BI-LEARN] Cached new successful query to Persistent Vault{log_tag}.")
@@ -85,8 +134,6 @@ def run(state):
     # --- DYNAMIC LEARNING LOOP (Long-Term Memory) ---
     try:
         memory = get_memory()
-        # Ensure we capture the raw question and the resulting insight
-        # Mem0 will use its internal LLM (Groq/OpenAI) to extract permanent facts from this string.
         memory_content = (
             f"User Interaction:\n"
             f"- Question/Statement: {state['question']}\n"
