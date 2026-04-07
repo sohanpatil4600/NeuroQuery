@@ -61,13 +61,7 @@ async def ask_stream(payload: dict):
                             }
                         }) + "\n"
                 
-                print(f"[STREAM] Finished graph for request {request_id}. Logging final metrics...")
                 # Final metrics collection
-                success = True
-                from_vault = full_state.get("from_vault", False)
-                retry_count = full_state.get("retry_count", 0)
-                # (Tokens would be summed from the collector's agent_traces if needed, 
-                # or we can pass them in the state)
                 
                 collector.log_request_final(
                     request_id=request_id,

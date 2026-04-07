@@ -106,8 +106,8 @@ def run(state):
         "kpis": {
             "primary_val": final_val,
             "primary_label": primary_metric_name,
-            "growth": "12.5%", 
-            "yoy": "8.2%"
+            "growth": None, # Placeholder for future dynamic calculation
+            "yoy": None      # Placeholder for future dynamic calculation
         },
         "data": df.to_dict("records"),
         "visual_config": visual_config,

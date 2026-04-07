@@ -26,46 +26,70 @@ The system is built on a "Self-Healing" architecture that automatically detects 
 
 ```mermaid
 graph TD
-    User((User)) -->|Natural Language| UI[Streamlit UI]
-    UI -->|Request| API[FastAPI / LangGraph]
+    %% User and UI Layer
+    User((User)) -->|Natural Language Query| UI[Streamlit UI / presentation_app.py]
     
-    subgraph "NeuroQuery Intelligence Engine"
-        MD[Metadata Agent]
-        RAG[RAG Agent]
-        SQL[SQL Agent]
-        IMP[Impact Agent]
-        EXE[Execute Agent]
-        BI[BI Interpreter Agent]
-        VLT[(Semantic Vault)]
-        Mem[(Mem0 Long-Term Memory)]
-        GB[Business Glossary]
+    subgraph "Frontend Layer (Streamlit)"
+        UI -->|Tab 1| UX_Chat[Interactive Chat Interface]
+        UI -->|Tab 3| UX_Metrics[Monitoring Hub / monitoring_hub.py]
+        UI -->|Tab 6| UX_Logs[Real-time Agent Logs]
+        UX_Chat -->|Requests| API
     end
 
-    API --> MD
-    MD -->|Check Shortcut| VLT
-    MD <-->|User Context| Mem
-    
-    MD --> RAG
-    RAG <-->|Retrieve Rules| GB
-    
-    RAG --> SQL
-    SQL -->|Analyze Context| IMP
-    IMP -->|Safety/Risk Check| EXE
-    
-    EXE -->|Run SQL| DB[(Enterprise BI DB)]
-    EXE -.->|Error Handle| SQL
-    
-    EXE --> BI
-    BI -->|Format KPIs| UI
-    BI -->|Cache Success| VLT
-    BI -->|Store Fact| Mem
-    
-    subgraph "Core Utilities"
-        Bill[Billing & Metering]
-        Log[Logger Utils]
+    subgraph "API & Orchestration Layer (FastAPI + LangGraph)"
+        API[FastAPI Gateway / main.py] -->|POST /ask/stream| LG[LangGraph Orchestrator / graph.py]
+        
+        %% Backend Utilities
+        API -.->|Check/Record Quota| Bill[Billing & Metering / billing_db.sqlite]
+        API -.->|Log Trace| Mon[Monitoring Collector / monitoring.sqlite]
     end
-    
-    API -.-> Bill
+
+    subgraph "6-Agent Cognitive Swarm"
+        direction TB
+        LG --> MD[1. Metadata Agent]
+        MD --> RAG[2. RAG Agent]
+        RAG --> SQL[3. SQL Agent]
+        SQL --> IMP[4. Impact Agent]
+        IMP --> EXE[5. Execute Agent]
+        
+        %% Self-Healing Loop
+        EXE -.->|SQL Error Detected| SQL
+        
+        EXE -->|Verified Results| BI[6. BI Agent]
+    end
+
+    subgraph "Intelligence & Memory Services"
+        %% External AI Services
+        MD & RAG & SQL & IMP & BI <-->|Inference| Groq[Groq API: Llama 3.3 70B]
+        MD & RAG & BI <-->|Embeddings| ST[SentenceTransformers: all-MiniLM-L6-v2]
+        
+        %% Persistence Integrations
+        MD <-->|Retrieve Preferences| Mem[(Mem0 Long-Term Memory)]
+        MD <-->|Check Shortcut| VLT[(Dynamic Semantic Vault)]
+        BI -->|Store Fact| Mem
+        BI -->|Cache Successful SQL| VLT
+    end
+
+    subgraph "Data Persistence Layer"
+        RAG <-->|Knowledge Retrieval| GB[Business Glossary / txt]
+        EXE <-->|Run SQL| DB[(Enterprise BI DB / sqlite)]
+        Bill <-->|History & Usage| BDB[(Billing DB / sqlite)]
+        Mon <-->|Latency & Agent Traces| MDB[(Monitoring DB / sqlite)]
+        VLT <-->|Stored Patterns| PDB[(Persistent Vault / sqlite)]
+    end
+
+    %% Final Output Flow
+    BI -->|JSON Insights + Viz Config| API
+    API -->|Async Stream| UX_Chat
+    UX_Chat -->|Render Plotly/KPIs| User
+
+    %% Styling
+    classDef mainNode fill:#7267EF,color:#fff,stroke:#333,stroke-width:2px;
+    classDef agentNode fill:#1e1e2d,color:#fff,stroke:#7267EF,stroke-width:2px;
+    classDef dbNode fill:#2c3e50,color:#fff,stroke:#bdc3c7,stroke-width:2px;
+    class LG,API,UI mainNode;
+    class MD,RAG,SQL,IMP,EXE,BI agentNode;
+    class DB,BDB,MDB,PDB,GB,Mem,VLT dbNode;
 ```
 
 ---
